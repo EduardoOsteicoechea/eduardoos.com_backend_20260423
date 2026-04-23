@@ -38,7 +38,7 @@ jobs:
           target: ${{ secrets.SERVER_TARGET_DIR }}
 
       - name: Sync artifacts to server (rsync, exclude SQLite files)
-        uses: burnett01/rsync-deployments@7.0.2
+        uses: burnett01/rsync-deployments@7.0.2 
         with:
           switches: -avzr --delete --exclude 'data/*.db*' --exclude 'data/*.db-shm' --exclude 'data/*.db-wal'
           path: dist/ package.json package-lock.json
