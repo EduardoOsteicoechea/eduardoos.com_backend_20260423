@@ -1,0 +1,60 @@
+name: Deploy Backend
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build TypeScript project
+        run: npm run build
+
+      - name: Copy project to server (SCP, no SQLite data)
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          source: "dist,package.json,package-lock.json"
+          target: ${{ secrets.SERVER_TARGET_DIR }}
+
+      - name: Sync artifacts to server (rsync, exclude SQLite files)
+        uses: burnett01/rsync-deployments@7.0.2
+        with:
+          switches: -avzr --delete --exclude 'data/*.db*' --exclude 'data/*.db-shm' --exclude 'data/*.db-wal'
+          path: dist/ package.json package-lock.json
+          remote_host: ${{ secrets.SERVER_HOST }}
+          remote_user: ${{ secrets.SERVER_USER }}
+          remote_key: ${{ secrets.SERVER_SSH_KEY }}
+          remote_path: ${{ secrets.SERVER_TARGET_DIR }}
+
+      - name: Safe DB bootstrap/migration on server
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            set -e
+            cd "${{ secrets.SERVER_TARGET_DIR }}"
+            mkdir -p data
+            if [ ! -f data/auth.db ] || [ ! -f data/articles.db ]; then
+              npm run db:init
+            fi
+            npx drizzle-kit migrate
