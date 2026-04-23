@@ -25,23 +25,22 @@ jobs:
       - name: Build TypeScript project
         run: npm run build
 
-      # Note: You currently have both SCP and rsync actions defined. 
-      # Usually, just the rsync step is enough since it handles delta transfers and exclusions cleanly. 
-      # I've left both in case you have a specific need, but you can safely remove the SCP block if rsync does the job.
       - name: Copy project to server (SCP, no SQLite data)
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
-          source: "dist,package.json,package-lock.json"
+          # Added src, drizzle, and drizzle config so the server can run the init and migration scripts
+          source: "dist,src,drizzle,drizzle.config.ts,package.json,package-lock.json"
           target: ${{ secrets.SERVER_TARGET_DIR }}
 
       - name: Sync artifacts to server (rsync, exclude SQLite files)
-        uses: burnett01/rsync-deployments@7.0.2 
+        uses: burnett01/rsync-deployments@7.0.2
         with:
           switches: -avzr --delete --exclude 'data/*.db*' --exclude 'data/*.db-shm' --exclude 'data/*.db-wal'
-          path: dist/ package.json package-lock.json
+          # Added src/, drizzle/, and drizzle config here as well
+          path: dist/ src/ drizzle/ drizzle.config.ts package.json package-lock.json
           remote_host: ${{ secrets.SERVER_HOST }}
           remote_user: ${{ secrets.SERVER_USER }}
           remote_key: ${{ secrets.SERVER_SSH_KEY }}
