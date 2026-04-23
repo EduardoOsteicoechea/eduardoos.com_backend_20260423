@@ -57,16 +57,17 @@ jobs:
             set -e
             cd "${{ secrets.SERVER_TARGET_DIR }}"
             
-            # 1. Install production dependencies on the server
-            npm install --omit=dev
+            # 1. Install ALL dependencies so tsx and drizzle-kit are available
+            npm install
             
             # 2. Database Migrations
             mkdir -p data
             if [ ! -f data/auth.db ] || [ ! -f data/articles.db ]; then
               npm run db:init
             fi
-            npx drizzle-kit migrate
+            
+            # Added -y to automatically accept any npx installation prompts
+            npx -y drizzle-kit migrate
             
             # 3. Restart the application 
-            # (Assumes you are using PM2 globally on the server. Adjust 'dist/index.js' to your actual entry file if different)
             pm2 restart backend-api || pm2 start dist/index.js --name backend-api
