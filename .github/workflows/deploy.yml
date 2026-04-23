@@ -25,6 +25,9 @@ jobs:
       - name: Build TypeScript project
         run: npm run build
 
+      # Note: You currently have both SCP and rsync actions defined. 
+      # Usually, just the rsync step is enough since it handles delta transfers and exclusions cleanly. 
+      # I've left both in case you have a specific need, but you can safely remove the SCP block if rsync does the job.
       - name: Copy project to server (SCP, no SQLite data)
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -44,7 +47,7 @@ jobs:
           remote_key: ${{ secrets.SERVER_SSH_KEY }}
           remote_path: ${{ secrets.SERVER_TARGET_DIR }}
 
-      - name: Safe DB bootstrap/migration on server
+      - name: Safe DB bootstrap/migration and Start App
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.SERVER_HOST }}
@@ -53,8 +56,17 @@ jobs:
           script: |
             set -e
             cd "${{ secrets.SERVER_TARGET_DIR }}"
+            
+            # 1. Install production dependencies on the server
+            npm install --omit=dev
+            
+            # 2. Database Migrations
             mkdir -p data
             if [ ! -f data/auth.db ] || [ ! -f data/articles.db ]; then
               npm run db:init
             fi
             npx drizzle-kit migrate
+            
+            # 3. Restart the application 
+            # (Assumes you are using PM2 globally on the server. Adjust 'dist/index.js' to your actual entry file if different)
+            pm2 restart backend-api || pm2 start dist/index.js --name backend-api
