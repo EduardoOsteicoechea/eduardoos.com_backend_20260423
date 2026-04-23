@@ -50,7 +50,7 @@ jobs:
             
             # 2. Database Migrations
             mkdir -p data
-            npx drizzle-kit migrate
+            npm run db:migrate
             
             # 3. Restart the application 
             pm2 restart backend-api || pm2 start dist/server.js --name backend-api
