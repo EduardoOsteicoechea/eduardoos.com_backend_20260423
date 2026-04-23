@@ -25,8 +25,8 @@ app.use(
 );
 app.use(cookieParser());
 
-app.use(authRouter);
-app.use(articlesRouter);
+app.use("/api", authRouter);
+app.use("/api", articlesRouter);
 app.use(paymentRouter);
 
 app.get("/health", (_request, response) => {
