@@ -25,22 +25,11 @@ jobs:
       - name: Build TypeScript project
         run: npm run build
 
-      - name: Copy project to server (SCP, no SQLite data)
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
-          # Added src, drizzle, and drizzle config so the server can run the init and migration scripts
-          source: "dist,src,drizzle,drizzle.config.ts,package.json,package-lock.json"
-          target: ${{ secrets.SERVER_TARGET_DIR }}
-
-      - name: Sync artifacts to server (rsync, exclude SQLite files)
+      - name: Sync artifacts to server (rsync, root sync with excludes)
         uses: burnett01/rsync-deployments@7.0.2
         with:
-          switches: -avzr --delete --exclude 'data/*.db*' --exclude 'data/*.db-shm' --exclude 'data/*.db-wal'
-          # Added src/, drizzle/, and drizzle config here as well
-          path: dist/ src/ drizzle/ drizzle.config.ts package.json package-lock.json
+          switches: -avzr --delete --exclude '.git/' --exclude 'node_modules/' --exclude 'data/*.db*' --exclude 'data/*.db-shm' --exclude 'data/*.db-wal'
+          path: ./
           remote_host: ${{ secrets.SERVER_HOST }}
           remote_user: ${{ secrets.SERVER_USER }}
           remote_key: ${{ secrets.SERVER_SSH_KEY }}
@@ -56,17 +45,17 @@ jobs:
             set -e
             cd "${{ secrets.SERVER_TARGET_DIR }}"
             
-            # 1. Install ALL dependencies so tsx and drizzle-kit are available
+            # 1. Install dependencies natively on ARM64 server
             npm install
             
             # 2. Database Migrations
             mkdir -p data
+            test -f dist/db/init.js || { echo "dist/db/init.js missing after sync"; exit 1; }
             if [ ! -f data/auth.db ] || [ ! -f data/articles.db ]; then
               npm run db:init
             fi
             
-            # Added -y to automatically accept any npx installation prompts
-            npx -y drizzle-kit migrate
+            npx drizzle-kit migrate
             
             # 3. Restart the application 
             pm2 restart backend-api || pm2 start dist/index.js --name backend-api
