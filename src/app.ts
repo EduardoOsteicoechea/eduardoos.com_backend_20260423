@@ -1,4 +1,5 @@
 import cookieParser from "cookie-parser";
+import cors from "cors";
 import express from "express";
 import { authRouter } from "./routes/auth.routes";
 import { articlesRouter } from "./routes/articles.routes";
@@ -7,6 +8,21 @@ import { paymentRouter } from "./routes/payment.routes";
 export const app = express();
 
 app.use(express.json());
+app.use(
+  cors({
+    origin: [
+      "http://localhost:1424",
+      "http://localhost:1425",
+      "http://localhost:5173",
+      "http://localhost:4173",
+      "https://eduardoos.com",
+      "https://www.eduardoos.com"
+    ],
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "Accept"]
+  })
+);
 app.use(cookieParser());
 
 app.use(authRouter);
