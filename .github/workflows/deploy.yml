@@ -50,11 +50,6 @@ jobs:
             
             # 2. Database Migrations
             mkdir -p data
-            test -f dist/db/init.js || { echo "dist/db/init.js missing after sync"; exit 1; }
-            if [ ! -f data/auth.db ] || [ ! -f data/articles.db ]; then
-              npm run db:init
-            fi
-            
             npx drizzle-kit migrate
             
             # 3. Restart the application 
