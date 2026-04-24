@@ -1,0 +1,1 @@
+ALTER TABLE `lessons` ADD `tema_serie` text;

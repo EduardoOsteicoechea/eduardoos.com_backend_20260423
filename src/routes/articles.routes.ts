@@ -10,6 +10,10 @@ const articlesController = new ArticlesController(articlesService);
 
 export const articlesRouter = Router();
 
+articlesRouter.get("/public/articles/:slug", articlesController.retrievePublicArticleBySlug);
+
+articlesRouter.get("/check-slug", authenticate, articlesController.checkSlugAvailability);
+
 articlesRouter.post("/create-article", authenticate, validateRequestBody(createArticleSchema), articlesController.createArticle);
 articlesRouter.get("/retrieve-article/:id", authenticate, articlesController.retrieveArticleById);
 articlesRouter.get("/retrieve-articles", authenticate, articlesController.retrieveArticles);

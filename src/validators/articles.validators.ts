@@ -1,16 +1,37 @@
 import { z } from "zod";
 
+/** Empty / null = no media; non-empty must be a valid URL. */
+const optionalMediaUrl = z.preprocess(
+  (val) => (val === null || val === undefined ? "" : String(val).trim()),
+  z.union([z.literal(""), z.string().url()])
+);
+
 const mediaSchema = z.object({
   mediaType: z.enum(["image", "video", "audio", "link"]),
-  mediaUrl: z.string().url().trim(),
-  mediaTitle: z.string().min(1).max(120).trim(),
-  mediaDescription: z.string().min(1).max(400).trim()
+  mediaUrl: optionalMediaUrl,
+  mediaTitle: z.preprocess(
+    (val) => (val === null || val === undefined ? "" : String(val).trim()),
+    z.string().max(120)
+  ),
+  mediaDescription: z.preprocess(
+    (val) => (val === null || val === undefined ? "" : String(val).trim()),
+    z.string().max(400)
+  )
+});
+
+const biblicalQuoteSchema = z.object({
+  reference: z.string().min(1).max(200).trim(),
+  text: z.string().min(1).trim(),
+  emphasized: z.array(z.string().min(1)).optional()
 });
 
 const sectionSchema = z.object({
   sectionOrder: z.number().int().min(1),
   sectionTitle: z.string().min(1).max(180).trim(),
-  sectionBody: z.string().min(1).trim(),
+  sectionBody: z.string().optional(),
+  content: z.array(z.string().min(1)).min(1),
+  biblical_quotes: z.array(biblicalQuoteSchema).optional(),
+  emphasyzed_phrases: z.array(z.string().min(1)).optional(),
   multimedia: z.array(mediaSchema).min(1)
 });
 
@@ -27,8 +48,17 @@ const quizQuestionSchema = z.object({
   rationale: z.string().min(1).max(800).trim()
 });
 
+const slugSchema = z
+  .string()
+  .min(1)
+  .max(120)
+  .trim()
+  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Slug must be lowercase letters, numbers, and single hyphens.");
+
 const lessonPayloadSchema = z.object({
+  slug: slugSchema,
   serie: z.string().min(1).max(180).trim(),
+  tema_serie: z.string().min(1).max(120).trim(),
   facilitador: z.string().min(1).max(180).trim(),
   libro_de_pasaje: z.string().min(1).max(180).trim(),
   titulo_de_ensenanza: z.string().min(1).max(220).trim(),

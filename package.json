@@ -4,7 +4,7 @@
   "description": "Professional backend for eduardoos.com frontend",
   "main": "dist/server.js",
   "scripts": {
-    "dev": "tsx watch src/server.ts",
+    "dev": "tsx watch --exclude \"./data/**\" --exclude \"**/*.db\" --exclude \"**/*.db-shm\" --exclude \"**/*.db-wal\" src/server.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "lint": "tsc --noEmit -p tsconfig.json",

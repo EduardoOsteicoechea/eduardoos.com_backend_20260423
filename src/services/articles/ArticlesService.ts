@@ -14,7 +14,9 @@ const parseLesson = (lesson: typeof lessons.$inferSelect) => ({
 export class ArticlesService {
   createArticle(payload: CreateArticleBody) {
     const values: typeof lessons.$inferInsert = {
+      slug: payload.slug.trim().toLowerCase(),
       serie: payload.serie,
+      temaSerie: payload.tema_serie,
       facilitador: payload.facilitador,
       libroDePasaje: payload.libro_de_pasaje,
       tituloDeEnsenanza: payload.titulo_de_ensenanza,
@@ -41,13 +43,42 @@ export class ArticlesService {
     return parseLesson(found);
   }
 
+  retrieveArticleBySlug(slug: string) {
+    const normalizedSlug = slug.trim().toLowerCase();
+    const found = articlesDb.select().from(lessons).where(eq(lessons.slug, normalizedSlug)).get();
+    if (!found) {
+      return null;
+    }
+    return parseLesson(found);
+  }
+
+  /**
+   * True if no row uses this slug, or the only row is `excludeId` (for edits).
+   */
+  isSlugAvailable(slug: string, excludeId?: number): boolean {
+    const normalizedSlug = slug.trim().toLowerCase();
+    if (!normalizedSlug) {
+      return false;
+    }
+    const found = articlesDb.select().from(lessons).where(eq(lessons.slug, normalizedSlug)).get();
+    if (!found) {
+      return true;
+    }
+    if (excludeId !== undefined && found.id === excludeId) {
+      return true;
+    }
+    return false;
+  }
+
   retrieveArticles() {
     return articlesDb.select().from(lessons).all().map(parseLesson);
   }
 
   updateArticle(id: number, payload: UpdateArticleBody) {
     const updateValues: Partial<typeof lessons.$inferInsert> = {};
+    if (payload.slug !== undefined) updateValues.slug = payload.slug.trim().toLowerCase();
     if (payload.serie !== undefined) updateValues.serie = payload.serie;
+    if (payload.tema_serie !== undefined) updateValues.temaSerie = payload.tema_serie;
     if (payload.facilitador !== undefined) updateValues.facilitador = payload.facilitador;
     if (payload.libro_de_pasaje !== undefined) updateValues.libroDePasaje = payload.libro_de_pasaje;
     if (payload.titulo_de_ensenanza !== undefined) updateValues.tituloDeEnsenanza = payload.titulo_de_ensenanza;

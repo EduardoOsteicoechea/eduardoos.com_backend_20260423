@@ -15,7 +15,9 @@ export const transactions = sqliteTable("transactions", {
 
 export const lessons = sqliteTable("lessons", {
   id: integer("id").primaryKey({ autoIncrement: true }),
+  slug: text("slug").unique(),
   serie: text("serie"),
+  temaSerie: text("tema_serie"),
   facilitador: text("facilitador"),
   libroDePasaje: text("libro_de_pasaje"),
   tituloDeEnsenanza: text("titulo_de_ensenanza"),
