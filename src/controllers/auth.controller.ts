@@ -5,19 +5,52 @@ import crypto from "node:crypto";
 import nodemailer from "nodemailer";
 import { env } from "../config/env";
 import { ACCESS_COOKIE_NAME, REFRESH_COOKIE_NAME, baseCookieOptions } from "../config/cookies";
-import { authDb } from "../db";
+import { authDb, authSqlite } from "../db";
 import { users } from "../db/auth-schema";
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from "../utils/jwt";
 import type { ForgotPasswordBody, LoginBody, ResetPasswordBody } from "../validators/auth.validators";
 
 export class AuthController {
   private readonly bcryptRounds = Number(process.env.BCRYPT_ROUNDS ?? 12);
+  private loginColumnName: "username" | "email" | null = null;
 
   private hashPassword = async (rawPassword: string): Promise<string> =>
     bcrypt.hash(rawPassword, this.bcryptRounds);
 
   private comparePassword = async (rawPassword: string, hashedPassword: string): Promise<boolean> =>
     bcrypt.compare(rawPassword, hashedPassword);
+
+  private resolveLoginColumnName = (): "username" | "email" => {
+    if (this.loginColumnName) {
+      return this.loginColumnName;
+    }
+
+    const tableInfo = authSqlite
+      .prepare("PRAGMA table_info(users)")
+      .all() as Array<{ name?: string }>;
+    const availableColumns = new Set(tableInfo.map((column) => column.name));
+
+    this.loginColumnName = availableColumns.has("username") ? "username" : "email";
+    return this.loginColumnName;
+  };
+
+  private findUserByLoginIdentifier = (loginIdentifier: string) => {
+    const loginColumnName = this.resolveLoginColumnName();
+
+    if (loginColumnName === "username") {
+      return authDb
+        .select()
+        .from(users)
+        .where(sql`lower(${users.username}) = ${loginIdentifier}`)
+        .get();
+    }
+
+    return authSqlite
+      .prepare(
+        `SELECT id, email AS username, password_hash AS passwordHash, reset_password_token AS resetPasswordToken, reset_password_expires AS resetPasswordExpires, created_at AS createdAt FROM users WHERE lower(email) = ? LIMIT 1`
+      )
+      .get(loginIdentifier) as (typeof users.$inferSelect & { username: string }) | undefined;
+  };
 
   private mailTransporter: nodemailer.Transporter = nodemailer.createTransport({
     service: "gmail",
@@ -40,11 +73,7 @@ export class AuthController {
     const username = request.body.username.trim().toLowerCase();
     const password = request.body.password;
 
-    const user = authDb
-      .select()
-      .from(users)
-      .where(sql`lower(${users.username}) = ${username}`)
-      .get();
+    const user = this.findUserByLoginIdentifier(username);
     console.log("Database User Found:", user ? "Yes" : "No");
 
     if (!user) {
@@ -85,11 +114,7 @@ export class AuthController {
     response: Response
   ): Promise<void> => {
     const email = request.body.email.trim().toLowerCase();
-    const user = authDb
-      .select()
-      .from(users)
-      .where(sql`lower(${users.username}) = ${email}`)
-      .get();
+    const user = this.findUserByLoginIdentifier(email);
 
     // Keep response generic to avoid account enumeration.
     if (!user) {
