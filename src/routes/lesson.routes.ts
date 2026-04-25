@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { LessonController } from "../controllers/lesson.controller";
-import { authMiddleware } from "../middleware/auth.middleware";
+import { authenticate } from "../middleware/authenticate";
 import { validateRequestBody } from "../middleware/validateRequest";
 import { createLessonSchema, updateLessonSchema } from "../validators/lesson.validators";
 
@@ -8,7 +8,7 @@ const lessonController = new LessonController();
 
 export const lessonRouter = Router();
 
-lessonRouter.use(authMiddleware);
+lessonRouter.use(authenticate);
 
 lessonRouter.post("/lecciones", validateRequestBody(createLessonSchema), lessonController.createLesson);
 lessonRouter.get("/lecciones", lessonController.getLessons);

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { AuthController } from "../controllers/auth.controller";
-import { authMiddleware } from "../middleware/auth.middleware";
+import { authenticate } from "../middleware/authenticate";
 import { validateRequestBody } from "../middleware/validateRequest";
 import {
   forgotPasswordSchema,
@@ -23,4 +23,4 @@ authRouter.post(
   validateRequestBody(resetPasswordSchema),
   authController.resetPassword
 );
-authRouter.get("/profile", authMiddleware, authController.profile);
+authRouter.get("/profile", authenticate, authController.profile);

@@ -1,14 +1,23 @@
 import type { Request, Response } from "express";
 import { eq, sql } from "drizzle-orm";
+import bcrypt from "bcrypt";
 import crypto from "node:crypto";
 import nodemailer from "nodemailer";
 import { env } from "../config/env";
 import { authDb } from "../db";
 import { users } from "../db/auth-schema";
-import { comparePassword, hashPassword, signJwt } from "../utils/auth";
+import { signAccessToken } from "../utils/jwt";
 import type { ForgotPasswordBody, LoginBody, ResetPasswordBody } from "../validators/auth.validators";
 
 export class AuthController {
+  private readonly bcryptRounds = Number(process.env.BCRYPT_ROUNDS ?? 12);
+
+  private hashPassword = async (rawPassword: string): Promise<string> =>
+    bcrypt.hash(rawPassword, this.bcryptRounds);
+
+  private comparePassword = async (rawPassword: string, hashedPassword: string): Promise<boolean> =>
+    bcrypt.compare(rawPassword, hashedPassword);
+
   private mailTransporter: nodemailer.Transporter = nodemailer.createTransport({
     service: "gmail",
     host: "smtp.gmail.com",
@@ -37,14 +46,14 @@ export class AuthController {
       return;
     }
 
-    const isMatch = await comparePassword(password, user.passwordHash);
+    const isMatch = await this.comparePassword(password, user.passwordHash);
     console.log("Password Match:", isMatch);
     if (!isMatch) {
       response.status(401).json({ message: "Invalid credentials" });
       return;
     }
 
-    const token = signJwt({
+    const token = signAccessToken({
       sub: user.id,
       username: user.username
     });
@@ -124,7 +133,7 @@ export class AuthController {
       return;
     }
 
-    const nextPasswordHash = await hashPassword(newPassword);
+    const nextPasswordHash = await this.hashPassword(newPassword);
 
     authDb
       .update(users)

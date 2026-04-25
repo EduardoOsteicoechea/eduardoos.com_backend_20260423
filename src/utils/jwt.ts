@@ -4,7 +4,7 @@ import { env } from "../config/env";
 
 type JwtPayloadBase = {
   sub: string;
-  email: string;
+  username: string;
 };
 
 export const signAccessToken = (payload: JwtPayloadBase): string =>
