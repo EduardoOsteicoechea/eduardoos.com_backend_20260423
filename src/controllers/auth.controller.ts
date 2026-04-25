@@ -1,85 +1,161 @@
-import { Request, Response } from "express";
-import { ACCESS_COOKIE_NAME, REFRESH_COOKIE_NAME, baseCookieOptions } from "../config/cookies";
-import { AuthService } from "../services/auth/AuthService";
-import { LoginBody, RegisterBody, ResetPasswordBody } from "../validators/auth.validators";
+import type { Request, Response } from "express";
+import { eq, sql } from "drizzle-orm";
+import crypto from "node:crypto";
+import nodemailer from "nodemailer";
+import { env } from "../config/env";
+import { authDb } from "../db";
+import { users } from "../db/auth-schema";
+import { comparePassword, hashPassword, signJwt } from "../utils/auth";
+import type { ForgotPasswordBody, LoginBody, ResetPasswordBody } from "../validators/auth.validators";
 
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
-
-  register = async (request: Request<unknown, unknown, RegisterBody>, response: Response): Promise<void> => {
-    try {
-      const tokens = await this.authService.register(request.body.email, request.body.password);
-      this.setAuthCookies(response, tokens.accessToken, tokens.refreshToken);
-      response.status(201).json({ message: "User registered successfully" });
-    } catch (error) {
-      response.status(400).json({ message: (error as Error).message });
+  private mailTransporter: nodemailer.Transporter = nodemailer.createTransport({
+    service: "gmail",
+    host: "smtp.gmail.com",
+    port: 465,
+    secure: true,
+    auth: {
+      user: env.smtpUser,
+      pass: env.smtpPass
     }
-  };
+  });
 
   login = async (request: Request<unknown, unknown, LoginBody>, response: Response): Promise<void> => {
-    try {
-      const tokens = await this.authService.login(request.body.email, request.body.password);
-      this.setAuthCookies(response, tokens.accessToken, tokens.refreshToken);
-      response.status(200).json({ message: "Login successful" });
-    } catch (error) {
-      response.status(401).json({ message: (error as Error).message });
-    }
-  };
+    console.log("Login Attempt - Username:", request.body.username);
+    const username = request.body.username.trim().toLowerCase();
+    const password = request.body.password;
 
-  logout = async (request: Request, response: Response): Promise<void> => {
-    const refreshToken = request.cookies[REFRESH_COOKIE_NAME];
-    if (refreshToken) {
-      await this.authService.logout(refreshToken);
-    }
-    response.clearCookie(ACCESS_COOKIE_NAME, baseCookieOptions);
-    response.clearCookie(REFRESH_COOKIE_NAME, baseCookieOptions);
-    response.status(200).json({ message: "Logout successful" });
-  };
+    const user = authDb
+      .select()
+      .from(users)
+      .where(sql`lower(${users.username}) = ${username}`)
+      .get();
+    console.log("Database User Found:", user ? "Yes" : "No");
 
-  refreshToken = async (request: Request, response: Response): Promise<void> => {
-    try {
-      const refreshToken = request.cookies[REFRESH_COOKIE_NAME];
-      if (!refreshToken) {
-        response.status(401).json({ message: "Missing refresh token" });
-        return;
+    if (!user) {
+      response.status(401).json({ message: "Invalid credentials" });
+      return;
+    }
+
+    const isMatch = await comparePassword(password, user.passwordHash);
+    console.log("Password Match:", isMatch);
+    if (!isMatch) {
+      response.status(401).json({ message: "Invalid credentials" });
+      return;
+    }
+
+    const token = signJwt({
+      sub: user.id,
+      username: user.username
+    });
+
+    response.status(200).json({
+      token,
+      user: {
+        id: user.id,
+        username: user.username
       }
-      const tokens = await this.authService.refreshSession(refreshToken);
-      this.setAuthCookies(response, tokens.accessToken, tokens.refreshToken);
-      response.status(200).json({ message: "Session refreshed" });
-    } catch (error) {
-      response.status(401).json({ message: (error as Error).message });
+    });
+  };
+
+  forgotPassword = async (
+    request: Request<unknown, unknown, ForgotPasswordBody>,
+    response: Response
+  ): Promise<void> => {
+    const email = request.body.email.trim().toLowerCase();
+    const user = authDb
+      .select()
+      .from(users)
+      .where(sql`lower(${users.username}) = ${email}`)
+      .get();
+
+    // Keep response generic to avoid account enumeration.
+    if (!user) {
+      response.status(200).json({ message: "If the account exists, a recovery email has been sent." });
+      return;
     }
+
+    const token = crypto.randomBytes(32).toString("hex");
+    const expiryDate = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+
+    authDb
+      .update(users)
+      .set({
+        resetPasswordToken: token,
+        resetPasswordExpires: expiryDate
+      })
+      .where(eq(users.id, user.id))
+      .run();
+
+    const resetLink = `${env.frontendUrl}/reset-password?token=${encodeURIComponent(token)}`;
+    try {
+      await this.mailTransporter.sendMail({
+        from: env.smtpUser,
+        to: user.username,
+        subject: "Password reset request",
+        text: `Reset your password using this link: ${resetLink}`,
+        html: `<p>Reset your password using this link:</p><p><a href="${resetLink}">${resetLink}</a></p>`
+      });
+    } catch (error) {
+      console.error("Failed to send password reset email:", error);
+      response.status(500).json({ message: "Failed to send password reset email." });
+      return;
+    }
+
+    response.status(200).json({ message: "If the account exists, a recovery email has been sent." });
   };
 
   resetPassword = async (
     request: Request<unknown, unknown, ResetPasswordBody>,
     response: Response
   ): Promise<void> => {
-    await this.authService.requestPasswordReset(request.body.email);
-    response.status(200).json({ message: "If the email exists, a reset token has been sent." });
+    const token = request.body.token.trim();
+    const newPassword = request.body.newPassword;
+    const nowIso = new Date().toISOString();
+
+    const user = authDb
+      .select()
+      .from(users)
+      .where(sql`${users.resetPasswordToken} = ${token} AND ${users.resetPasswordExpires} > ${nowIso}`)
+      .get();
+
+    if (!user) {
+      response.status(400).json({ message: "Reset token is invalid or expired." });
+      return;
+    }
+
+    const nextPasswordHash = await hashPassword(newPassword);
+
+    authDb
+      .update(users)
+      .set({
+        passwordHash: nextPasswordHash,
+        resetPasswordToken: null,
+        resetPasswordExpires: null
+      })
+      .where(eq(users.id, user.id))
+      .run();
+
+    response.status(200).json({ message: "Password updated successfully." });
   };
 
   profile = (request: Request, response: Response): void => {
-    try {
-      if (!request.authenticatedUser) {
-        response.status(401).json({ message: "Unauthorized" });
-        return;
-      }
-      const profile = this.authService.getProfile(request.authenticatedUser.userId);
-      response.status(200).json(profile);
-    } catch (error) {
-      response.status(404).json({ message: (error as Error).message });
+    const authenticatedUserId = request.authenticatedUser?.userId;
+    if (!authenticatedUserId) {
+      response.status(401).json({ message: "Unauthorized" });
+      return;
     }
-  };
 
-  private setAuthCookies(response: Response, accessToken: string, refreshToken: string): void {
-    response.cookie(ACCESS_COOKIE_NAME, accessToken, {
-      ...baseCookieOptions,
-      maxAge: 15 * 60 * 1000
+    const user = authDb.select().from(users).where(eq(users.id, authenticatedUserId)).get();
+    if (!user) {
+      response.status(404).json({ message: "User not found" });
+      return;
+    }
+
+    response.status(200).json({
+      id: user.id,
+      username: user.username,
+      createdAt: user.createdAt
     });
-    response.cookie(REFRESH_COOKIE_NAME, refreshToken, {
-      ...baseCookieOptions,
-      maxAge: 7 * 24 * 60 * 60 * 1000
-    });
-  }
+  };
 }

@@ -4,7 +4,10 @@ dotenv.config();
 
 const requiredEnv = [
   "ACCESS_TOKEN_SECRET",
-  "REFRESH_TOKEN_SECRET"
+  "REFRESH_TOKEN_SECRET",
+  "SMTP_USER",
+  "SMTP_PASS",
+  "FRONTEND_URL"
 ] as const;
 
 for (const key of requiredEnv) {
@@ -23,5 +26,8 @@ export const env = {
   cookieSecure: process.env.COOKIE_SECURE === "true",
   paypalClientId: process.env.PAYPAL_CLIENT_ID ?? "",
   paypalClientSecret: process.env.PAYPAL_CLIENT_SECRET ?? "",
-  paypalBaseUrl: process.env.PAYPAL_BASE_URL ?? "https://api-m.sandbox.paypal.com"
+  paypalBaseUrl: process.env.PAYPAL_BASE_URL ?? "https://api-m.sandbox.paypal.com",
+  smtpUser: process.env.SMTP_USER!,
+  smtpPass: process.env.SMTP_PASS!,
+  frontendUrl: process.env.FRONTEND_URL!.replace(/\/+$/, "")
 };

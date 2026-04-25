@@ -1,6 +1,7 @@
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import express from "express";
+import { env } from "./config/env";
 import { authRouter } from "./routes/auth.routes";
 import { articlesRouter } from "./routes/articles.routes";
 import { paymentRouter } from "./routes/payment.routes";
@@ -11,6 +12,7 @@ app.use(express.json());
 app.use(
   cors({
     origin: [
+      env.frontendUrl,
       "http://localhost:1424",
       "http://localhost:1425",
       "http://localhost:5173",
