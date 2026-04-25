@@ -20,42 +20,43 @@ export class AuthController {
     bcrypt.compare(rawPassword, hashedPassword);
 
   private findUserByLoginIdentifier = (loginIdentifier: string): (typeof users.$inferSelect) | undefined => {
-    try {
-      const foundWithEmailOrUsername = authSqlite
-        .prepare(
-          `SELECT id, COALESCE(username, email) AS username, password_hash AS passwordHash, reset_password_token AS resetPasswordToken, reset_password_expires AS resetPasswordExpires, created_at AS createdAt
-           FROM users
-           WHERE lower(email) = ? OR lower(username) = ?
-           LIMIT 1`
-        )
-        .get(loginIdentifier, loginIdentifier);
+    const tableInfo = authSqlite
+      .prepare("PRAGMA table_info(users)")
+      .all() as Array<{ name?: string }>;
+    const columnNames = tableInfo
+      .map((column) => column.name)
+      .filter((columnName): columnName is string => !!columnName);
+    console.log("[AUTH DEBUG] Production columns detected:", columnNames);
 
-      return foundWithEmailOrUsername as (typeof users.$inferSelect) | undefined;
-    } catch {
-      try {
-        const foundWithEmailOnly = authSqlite
-          .prepare(
-            `SELECT id, email AS username, password_hash AS passwordHash, reset_password_token AS resetPasswordToken, reset_password_expires AS resetPasswordExpires, created_at AS createdAt
-             FROM users
-             WHERE lower(email) = ?
-             LIMIT 1`
-          )
-          .get(loginIdentifier);
+    const hasEmail = columnNames.includes("email");
+    const hasUsername = columnNames.includes("username");
 
-        return foundWithEmailOnly as (typeof users.$inferSelect) | undefined;
-      } catch {
-        const foundWithUsernameOnly = authSqlite
-          .prepare(
-            `SELECT id, username AS username, password_hash AS passwordHash, reset_password_token AS resetPasswordToken, reset_password_expires AS resetPasswordExpires, created_at AS createdAt
-             FROM users
-             WHERE lower(username) = ?
-             LIMIT 1`
-          )
-          .get(loginIdentifier);
+    let query = "";
+    let parameters: string[] = [];
 
-        return foundWithUsernameOnly as (typeof users.$inferSelect) | undefined;
-      }
+    if (hasEmail && hasUsername) {
+      query = `SELECT id, COALESCE(username, email) AS username, password_hash AS passwordHash, reset_password_token AS resetPasswordToken, reset_password_expires AS resetPasswordExpires, created_at AS createdAt
+               FROM users
+               WHERE lower(email) = ? OR lower(username) = ?
+               LIMIT 1`;
+      parameters = [loginIdentifier, loginIdentifier];
+    } else if (hasEmail) {
+      query = `SELECT id, email AS username, password_hash AS passwordHash, reset_password_token AS resetPasswordToken, reset_password_expires AS resetPasswordExpires, created_at AS createdAt
+               FROM users
+               WHERE lower(email) = ?
+               LIMIT 1`;
+      parameters = [loginIdentifier];
+    } else if (hasUsername) {
+      query = `SELECT id, username AS username, password_hash AS passwordHash, reset_password_token AS resetPasswordToken, reset_password_expires AS resetPasswordExpires, created_at AS createdAt
+               FROM users
+               WHERE lower(username) = ?
+               LIMIT 1`;
+      parameters = [loginIdentifier];
+    } else {
+      throw new Error("Users table does not include email or username columns.");
     }
+
+    return authSqlite.prepare(query).get(...parameters) as (typeof users.$inferSelect) | undefined;
   };
 
   private mailTransporter: nodemailer.Transporter = nodemailer.createTransport({
