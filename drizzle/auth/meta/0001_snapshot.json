@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "65d921b4-b6ce-457c-a0ab-bd3a6bd9783f",
-  "prevId": "00000000-0000-0000-0000-000000000000",
+  "id": "cd8f594c-7eba-4f43-9e15-bce60c5ec438",
+  "prevId": "65d921b4-b6ce-457c-a0ab-bd3a6bd9783f",
   "tables": {
     "lecciones": {
       "name": "lecciones",
@@ -94,6 +94,20 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false
+        },
+        "reset_password_token": {
+          "name": "reset_password_token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "reset_password_expires": {
+          "name": "reset_password_expires",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
           "autoincrement": false
         },
         "created_at": {

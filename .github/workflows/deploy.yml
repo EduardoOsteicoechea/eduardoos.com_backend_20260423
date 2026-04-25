@@ -48,9 +48,9 @@ jobs:
             # 1. Install dependencies natively on ARM64 server
             npm install
             
-            # 2. Database schema (drizzle-kit push; avoids conflict when tables already exist vs migrate)
+            # 2. Database schema (drizzle-kit migrate safely applies migrations)
             mkdir -p data
-            npm run db:push:auth && npm run db:push:articles
+            npm run db:migrate
             
             # 3. Restart the application 
             pm2 restart backend-api || pm2 start dist/server.js --name backend-api
