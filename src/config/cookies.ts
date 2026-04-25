@@ -5,6 +5,6 @@ export const REFRESH_COOKIE_NAME = "refresh_token";
 
 export const baseCookieOptions = {
   httpOnly: true,
-  secure: env.cookieSecure,
+  secure: false,
   sameSite: "strict" as const
 };
