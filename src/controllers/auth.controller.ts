@@ -4,9 +4,10 @@ import bcrypt from "bcrypt";
 import crypto from "node:crypto";
 import nodemailer from "nodemailer";
 import { env } from "../config/env";
+import { ACCESS_COOKIE_NAME, REFRESH_COOKIE_NAME, baseCookieOptions } from "../config/cookies";
 import { authDb } from "../db";
 import { users } from "../db/auth-schema";
-import { signAccessToken } from "../utils/jwt";
+import { signAccessToken, signRefreshToken, verifyRefreshToken } from "../utils/jwt";
 import type { ForgotPasswordBody, LoginBody, ResetPasswordBody } from "../validators/auth.validators";
 
 export class AuthController {
@@ -21,8 +22,11 @@ export class AuthController {
   private mailTransporter: nodemailer.Transporter = nodemailer.createTransport({
     service: "gmail",
     host: "smtp.gmail.com",
-    port: 465,
-    secure: true,
+    port: 587,
+    secure: false,
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 10000,
     auth: {
       user: env.smtpUser,
       pass: env.smtpPass
@@ -53,13 +57,20 @@ export class AuthController {
       return;
     }
 
-    const token = signAccessToken({
+    const accessToken = signAccessToken({
+      sub: user.id,
+      username: user.username
+    });
+    const refreshToken = signRefreshToken({
       sub: user.id,
       username: user.username
     });
 
+    response.cookie(ACCESS_COOKIE_NAME, accessToken, baseCookieOptions);
+    response.cookie(REFRESH_COOKIE_NAME, refreshToken, baseCookieOptions);
+
     response.status(200).json({
-      token,
+      token: accessToken,
       user: {
         id: user.id,
         username: user.username
@@ -146,6 +157,33 @@ export class AuthController {
       .run();
 
     response.status(200).json({ message: "Password updated successfully." });
+  };
+
+  refreshToken = (request: Request, response: Response): void => {
+    const refreshToken = request.cookies[REFRESH_COOKIE_NAME];
+    if (!refreshToken) {
+      response.status(401).json({ message: "Missing refresh token" });
+      return;
+    }
+
+    try {
+      const payload = verifyRefreshToken(refreshToken);
+      const user = authDb.select().from(users).where(eq(users.id, payload.sub)).get();
+      if (!user) {
+        response.status(401).json({ message: "Invalid refresh token" });
+        return;
+      }
+
+      const accessToken = signAccessToken({
+        sub: user.id,
+        username: user.username
+      });
+
+      response.cookie(ACCESS_COOKIE_NAME, accessToken, baseCookieOptions);
+      response.status(200).json({ message: "Access token refreshed successfully." });
+    } catch {
+      response.status(401).json({ message: "Invalid refresh token" });
+    }
   };
 
   profile = (request: Request, response: Response): void => {

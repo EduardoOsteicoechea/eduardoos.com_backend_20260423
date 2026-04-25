@@ -23,4 +23,5 @@ authRouter.post(
   validateRequestBody(resetPasswordSchema),
   authController.resetPassword
 );
+authRouter.post("/auth/refresh-token", authController.refreshToken);
 authRouter.get("/profile", authenticate, authController.profile);
