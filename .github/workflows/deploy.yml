@@ -35,7 +35,7 @@ jobs:
           remote_key: ${{ secrets.SERVER_SSH_KEY }}
           remote_path: ${{ secrets.SERVER_TARGET_DIR }}
 
-      - name: Safe DB bootstrap/migration and Start App
+      - name: Safe DB schema sync and Start App
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.SERVER_HOST }}
@@ -48,9 +48,9 @@ jobs:
             # 1. Install dependencies natively on ARM64 server
             npm install
             
-            # 2. Database Migrations
+            # 2. Database schema (drizzle-kit push; avoids conflict when tables already exist vs migrate)
             mkdir -p data
-            npm run db:migrate
+            npm run db:push:auth && npm run db:push:articles
             
             # 3. Restart the application 
             pm2 restart backend-api || pm2 start dist/server.js --name backend-api
