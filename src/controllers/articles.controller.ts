@@ -45,6 +45,39 @@ export class ArticlesController {
     response.status(200).json(article);
   };
 
+  retrievePublicArticleByPath = (
+    request: Request<{ seriesSlug: string; authorSlug: string; articleSlug: string }>,
+    response: Response
+  ): void => {
+    const { seriesSlug, authorSlug, articleSlug } = request.params;
+    const article = this.articlesService.retrieveArticleByRoutePath(seriesSlug, authorSlug, articleSlug);
+    if (!article) {
+      response.status(404).json({ message: "Article not found" });
+      return;
+    }
+    response.status(200).json(article);
+  };
+
+  retrievePublicSeries = (_request: Request, response: Response): void => {
+    const series = this.articlesService.retrievePublicSeries();
+    response.status(200).json(series);
+  };
+
+  retrievePublicSeriesAuthors = (request: Request<{ seriesSlug: string }>, response: Response): void => {
+    const seriesSlug = request.params.seriesSlug ?? "";
+    const authors = this.articlesService.retrievePublicSeriesAuthors(seriesSlug);
+    response.status(200).json(authors);
+  };
+
+  retrievePublicAuthorArticles = (
+    request: Request<{ seriesSlug: string; authorSlug: string }>,
+    response: Response
+  ): void => {
+    const { seriesSlug, authorSlug } = request.params;
+    const articles = this.articlesService.retrievePublicAuthorArticles(seriesSlug, authorSlug);
+    response.status(200).json(articles);
+  };
+
   retrieveArticles = (_request: Request, response: Response): void => {
     const articles = this.articlesService.retrieveArticles();
     response.status(200).json(articles);

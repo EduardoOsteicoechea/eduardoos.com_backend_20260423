@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { articlesDb } from "../../db";
 import { lessons } from "../../db/articles-schema";
 import { CreateArticleBody, UpdateArticleBody } from "../../validators/articles.validators";
@@ -10,6 +10,35 @@ const parseLesson = (lesson: typeof lessons.$inferSelect) => ({
   sections: lesson.sections ? JSON.parse(lesson.sections) : [],
   quiz: lesson.quiz ? JSON.parse(lesson.quiz) : []
 });
+
+const toTitleCase = (value: string): string =>
+  value
+    .replace(/-/g, " ")
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+
+export type PublicSeriesListItem = {
+  seriesSlug: string;
+  seriesName: string;
+  articleCount: number;
+};
+
+export type PublicSeriesAuthorListItem = {
+  seriesSlug: string;
+  authorSlug: string;
+  authorName: string;
+  articleCount: number;
+};
+
+export type PublicAuthorArticleListItem = {
+  seriesSlug: string;
+  authorSlug: string;
+  articleSlug: string;
+  articleTitle: string;
+  routePath: string;
+};
 
 export class ArticlesService {
   createArticle(payload: CreateArticleBody) {
@@ -50,6 +79,130 @@ export class ArticlesService {
       return null;
     }
     return parseLesson(found);
+  }
+
+  retrieveArticleByRoutePath(seriesSlug: string, authorSlug: string, articleSlug: string) {
+    const normalizedSeriesSlug = seriesSlug.trim().toLowerCase();
+    const normalizedAuthorSlug = authorSlug.trim().toLowerCase();
+    const normalizedArticleSlug = articleSlug.trim().toLowerCase();
+    const normalizedRoutePath =
+      `biblia/series/${normalizedSeriesSlug}/${normalizedAuthorSlug}/${normalizedArticleSlug}`;
+
+    const foundByPath = articlesDb
+      .select()
+      .from(lessons)
+      .where(eq(lessons.routePath, normalizedRoutePath))
+      .get();
+
+    if (foundByPath) {
+      return parseLesson(foundByPath);
+    }
+
+    const foundByComposite = articlesDb
+      .select()
+      .from(lessons)
+      .where(
+        and(
+          eq(lessons.seriesSlug, normalizedSeriesSlug),
+          eq(lessons.authorSlug, normalizedAuthorSlug),
+          eq(lessons.articleSlug, normalizedArticleSlug)
+        )
+      )
+      .get();
+
+    if (!foundByComposite) {
+      return null;
+    }
+
+    return parseLesson(foundByComposite);
+  }
+
+  retrievePublicSeries(): PublicSeriesListItem[] {
+    const rows = articlesDb.select().from(lessons).all();
+    const grouped = new Map<string, PublicSeriesListItem>();
+
+    for (const row of rows) {
+      const seriesSlug = (row.seriesSlug ?? "").trim().toLowerCase();
+      if (!seriesSlug) {
+        continue;
+      }
+      const existing = grouped.get(seriesSlug);
+      if (existing) {
+        existing.articleCount += 1;
+        continue;
+      }
+      grouped.set(seriesSlug, {
+        seriesSlug,
+        seriesName: toTitleCase(seriesSlug),
+        articleCount: 1
+      });
+    }
+
+    return [...grouped.values()].sort((a, b) => a.seriesName.localeCompare(b.seriesName));
+  }
+
+  retrievePublicSeriesAuthors(seriesSlug: string): PublicSeriesAuthorListItem[] {
+    const normalizedSeriesSlug = seriesSlug.trim().toLowerCase();
+    const rows = articlesDb
+      .select()
+      .from(lessons)
+      .where(eq(lessons.seriesSlug, normalizedSeriesSlug))
+      .all();
+
+    const grouped = new Map<string, PublicSeriesAuthorListItem>();
+
+    for (const row of rows) {
+      const authorSlug = (row.authorSlug ?? "").trim().toLowerCase();
+      if (!authorSlug) {
+        continue;
+      }
+      const existing = grouped.get(authorSlug);
+      if (existing) {
+        existing.articleCount += 1;
+        continue;
+      }
+      grouped.set(authorSlug, {
+        seriesSlug: normalizedSeriesSlug,
+        authorSlug,
+        authorName: toTitleCase(authorSlug),
+        articleCount: 1
+      });
+    }
+
+    return [...grouped.values()].sort((a, b) => a.authorName.localeCompare(b.authorName));
+  }
+
+  retrievePublicAuthorArticles(seriesSlug: string, authorSlug: string): PublicAuthorArticleListItem[] {
+    const normalizedSeriesSlug = seriesSlug.trim().toLowerCase();
+    const normalizedAuthorSlug = authorSlug.trim().toLowerCase();
+    const rows = articlesDb
+      .select()
+      .from(lessons)
+      .where(
+        and(
+          eq(lessons.seriesSlug, normalizedSeriesSlug),
+          eq(lessons.authorSlug, normalizedAuthorSlug)
+        )
+      )
+      .all();
+
+    return rows
+      .map((row) => {
+        const articleSlug = (row.articleSlug ?? "").trim().toLowerCase();
+        const routePath =
+          (row.routePath ?? "").trim() ||
+          `biblia/series/${normalizedSeriesSlug}/${normalizedAuthorSlug}/${articleSlug}`;
+        const articleTitle = (row.tituloDeEnsenanza ?? "").trim() || toTitleCase(articleSlug);
+        return {
+          seriesSlug: normalizedSeriesSlug,
+          authorSlug: normalizedAuthorSlug,
+          articleSlug,
+          articleTitle,
+          routePath
+        };
+      })
+      .filter((item) => item.articleSlug.length > 0)
+      .sort((a, b) => a.articleTitle.localeCompare(b.articleTitle));
   }
 
   /**
