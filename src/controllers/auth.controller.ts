@@ -12,7 +12,6 @@ import type { ForgotPasswordBody, LoginBody, ResetPasswordBody } from "../valida
 
 export class AuthController {
   private readonly bcryptRounds = Number(process.env.BCRYPT_ROUNDS ?? 12);
-  private loginColumnName: "username" | "email" | null = null;
 
   private hashPassword = async (rawPassword: string): Promise<string> =>
     bcrypt.hash(rawPassword, this.bcryptRounds);
@@ -20,36 +19,43 @@ export class AuthController {
   private comparePassword = async (rawPassword: string, hashedPassword: string): Promise<boolean> =>
     bcrypt.compare(rawPassword, hashedPassword);
 
-  private resolveLoginColumnName = (): "username" | "email" => {
-    if (this.loginColumnName) {
-      return this.loginColumnName;
+  private findUserByLoginIdentifier = (loginIdentifier: string): (typeof users.$inferSelect) | undefined => {
+    try {
+      const foundWithEmailOrUsername = authSqlite
+        .prepare(
+          `SELECT id, COALESCE(username, email) AS username, password_hash AS passwordHash, reset_password_token AS resetPasswordToken, reset_password_expires AS resetPasswordExpires, created_at AS createdAt
+           FROM users
+           WHERE lower(email) = ? OR lower(username) = ?
+           LIMIT 1`
+        )
+        .get(loginIdentifier, loginIdentifier);
+
+      return foundWithEmailOrUsername as (typeof users.$inferSelect) | undefined;
+    } catch {
+      try {
+        const foundWithEmailOnly = authSqlite
+          .prepare(
+            `SELECT id, email AS username, password_hash AS passwordHash, reset_password_token AS resetPasswordToken, reset_password_expires AS resetPasswordExpires, created_at AS createdAt
+             FROM users
+             WHERE lower(email) = ?
+             LIMIT 1`
+          )
+          .get(loginIdentifier);
+
+        return foundWithEmailOnly as (typeof users.$inferSelect) | undefined;
+      } catch {
+        const foundWithUsernameOnly = authSqlite
+          .prepare(
+            `SELECT id, username AS username, password_hash AS passwordHash, reset_password_token AS resetPasswordToken, reset_password_expires AS resetPasswordExpires, created_at AS createdAt
+             FROM users
+             WHERE lower(username) = ?
+             LIMIT 1`
+          )
+          .get(loginIdentifier);
+
+        return foundWithUsernameOnly as (typeof users.$inferSelect) | undefined;
+      }
     }
-
-    const tableInfo = authSqlite
-      .prepare("PRAGMA table_info(users)")
-      .all() as Array<{ name?: string }>;
-    const availableColumns = new Set(tableInfo.map((column) => column.name));
-
-    this.loginColumnName = availableColumns.has("username") ? "username" : "email";
-    return this.loginColumnName;
-  };
-
-  private findUserByLoginIdentifier = (loginIdentifier: string) => {
-    const loginColumnName = this.resolveLoginColumnName();
-
-    if (loginColumnName === "username") {
-      return authDb
-        .select()
-        .from(users)
-        .where(sql`lower(${users.username}) = ${loginIdentifier}`)
-        .get();
-    }
-
-    return authSqlite
-      .prepare(
-        `SELECT id, email AS username, password_hash AS passwordHash, reset_password_token AS resetPasswordToken, reset_password_expires AS resetPasswordExpires, created_at AS createdAt FROM users WHERE lower(email) = ? LIMIT 1`
-      )
-      .get(loginIdentifier) as (typeof users.$inferSelect & { username: string }) | undefined;
   };
 
   private mailTransporter: nodemailer.Transporter = nodemailer.createTransport({
@@ -73,7 +79,14 @@ export class AuthController {
     const username = request.body.username.trim().toLowerCase();
     const password = request.body.password;
 
-    const user = this.findUserByLoginIdentifier(username);
+    let user: typeof users.$inferSelect | undefined;
+    try {
+      user = this.findUserByLoginIdentifier(username);
+    } catch (error) {
+      console.error("Login user lookup failed:", error);
+      response.status(500).json({ message: "Unable to process login request." });
+      return;
+    }
     console.log("Database User Found:", user ? "Yes" : "No");
 
     if (!user) {
@@ -114,7 +127,14 @@ export class AuthController {
     response: Response
   ): Promise<void> => {
     const email = request.body.email.trim().toLowerCase();
-    const user = this.findUserByLoginIdentifier(email);
+    let user: typeof users.$inferSelect | undefined;
+    try {
+      user = this.findUserByLoginIdentifier(email);
+    } catch (error) {
+      console.error("Forgot password user lookup failed:", error);
+      response.status(500).json({ message: "Unable to process forgot password request." });
+      return;
+    }
 
     // Keep response generic to avoid account enumeration.
     if (!user) {
