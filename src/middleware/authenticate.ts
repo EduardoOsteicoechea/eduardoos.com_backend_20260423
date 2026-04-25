@@ -11,8 +11,9 @@ export const authenticate = (request: Request, response: Response, next: NextFun
 
   try {
     const payload = verifyAccessToken(accessToken);
+    const authenticatedUserId: string = payload.sub;
     request.authenticatedUser = {
-      userId: payload.sub,
+      userId: authenticatedUserId,
       username: payload.username
     };
     next();

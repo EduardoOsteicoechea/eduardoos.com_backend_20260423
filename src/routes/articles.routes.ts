@@ -11,16 +11,17 @@ const articlesController = new ArticlesController(articlesService);
 export const articlesRouter = Router();
 
 articlesRouter.get("/public/articles/:slug", articlesController.retrievePublicArticleBySlug);
-articlesRouter.get(
-  "/public/articles/by-path/:seriesSlug/:authorSlug/:articleSlug",
-  articlesController.retrievePublicArticleByPath
-);
-articlesRouter.get("/public/series", articlesController.retrievePublicSeries);
-articlesRouter.get("/public/series/:seriesSlug/authors", articlesController.retrievePublicSeriesAuthors);
-articlesRouter.get(
-  "/public/series/:seriesSlug/authors/:authorSlug/articles",
-  articlesController.retrievePublicAuthorArticles
-);
+// TODO: Re-enable once controller methods are finalized.
+// articlesRouter.get(
+//   "/public/articles/by-path/:seriesSlug/:authorSlug/:articleSlug",
+//   articlesController.retrievePublicArticleByPath
+// );
+// articlesRouter.get("/public/series", articlesController.retrievePublicSeries);
+// articlesRouter.get("/public/series/:seriesSlug/authors", articlesController.retrievePublicSeriesAuthors);
+// articlesRouter.get(
+//   "/public/series/:seriesSlug/authors/:authorSlug/articles",
+//   articlesController.retrievePublicAuthorArticles
+// );
 
 articlesRouter.get("/check-slug", articlesController.checkSlugAvailability);
 

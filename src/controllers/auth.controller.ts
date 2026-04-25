@@ -149,7 +149,7 @@ export class AuthController {
   };
 
   profile = (request: Request, response: Response): void => {
-    const authenticatedUserId = request.authenticatedUser?.userId;
+    const authenticatedUserId: string | undefined = request.authenticatedUser?.userId;
     if (!authenticatedUserId) {
       response.status(401).json({ message: "Unauthorized" });
       return;

@@ -6,7 +6,7 @@ import type { CreateLessonBody, UpdateLessonBody } from "../validators/lesson.va
 
 export class LessonController {
   createLesson = (request: Request<unknown, unknown, CreateLessonBody>, response: Response): void => {
-    const authenticatedUserId = request.authenticatedUser?.userId;
+    const authenticatedUserId: string | undefined = request.authenticatedUser?.userId;
     if (!authenticatedUserId) {
       response.status(401).json({ message: "Unauthorized" });
       return;
@@ -50,7 +50,7 @@ export class LessonController {
     request: Request<{ id: string }, unknown, UpdateLessonBody>,
     response: Response
   ): void => {
-    const authenticatedUserId = request.authenticatedUser?.userId;
+    const authenticatedUserId: string | undefined = request.authenticatedUser?.userId;
     if (!authenticatedUserId) {
       response.status(401).json({ message: "Unauthorized" });
       return;
@@ -87,7 +87,7 @@ export class LessonController {
   };
 
   deleteLesson = (request: Request<{ id: string }>, response: Response): void => {
-    const authenticatedUserId = request.authenticatedUser?.userId;
+    const authenticatedUserId: string | undefined = request.authenticatedUser?.userId;
     if (!authenticatedUserId) {
       response.status(401).json({ message: "Unauthorized" });
       return;
