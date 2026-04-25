@@ -8,6 +8,7 @@ import { lessonRouter } from "./routes/lesson.routes";
 import { paymentRouter } from "./routes/payment.routes";
 
 export const app = express();
+app.set("trust proxy", 1);
 
 app.use(express.json());
 app.use(
