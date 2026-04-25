@@ -3,7 +3,7 @@ import { sql } from "drizzle-orm";
 
 export const transactions = sqliteTable("transactions", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  userId: integer("user_id").notNull(),
+  userId: text("user_id").notNull(),
   orderId: text("order_id").notNull(),
   provider: text("provider").notNull(),
   status: text("status").notNull(),
@@ -16,6 +16,10 @@ export const transactions = sqliteTable("transactions", {
 export const lessons = sqliteTable("lessons", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   slug: text("slug").unique(),
+  seriesSlug: text("series_slug"),
+  authorSlug: text("author_slug"),
+  articleSlug: text("article_slug"),
+  routePath: text("route_path").unique(),
   serie: text("serie"),
   temaSerie: text("tema_serie"),
   facilitador: text("facilitador"),
