@@ -28,7 +28,7 @@ jobs:
       - name: Sync artifacts to server (rsync, root sync with excludes)
         uses: burnett01/rsync-deployments@7.0.2
         with:
-          switches: -avzr --delete --exclude '.git/' --exclude 'node_modules/' --exclude 'data/*.db*' --exclude 'data/*.db-shm' --exclude 'data/*.db-wal'
+          switches: -avzr --delete --exclude '.git/' --exclude 'node_modules/' --exclude '.env' --exclude 'data/' --exclude 'data/*.db*' --exclude 'data/*.db-shm' --exclude 'data/*.db-wal'
           path: ./
           remote_host: ${{ secrets.SERVER_HOST }}
           remote_user: ${{ secrets.SERVER_USER }}
