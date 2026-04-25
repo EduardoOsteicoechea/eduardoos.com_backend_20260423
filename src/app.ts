@@ -4,6 +4,7 @@ import express from "express";
 import { env } from "./config/env";
 import { authRouter } from "./routes/auth.routes";
 import { articlesRouter } from "./routes/articles.routes";
+import { lessonRouter } from "./routes/lesson.routes";
 import { paymentRouter } from "./routes/payment.routes";
 
 export const app = express();
@@ -29,6 +30,7 @@ app.use(cookieParser());
 
 app.use("/api", authRouter);
 app.use("/api", articlesRouter);
+app.use("/api", lessonRouter);
 app.use(paymentRouter);
 
 app.get("/health", (_request, response) => {
