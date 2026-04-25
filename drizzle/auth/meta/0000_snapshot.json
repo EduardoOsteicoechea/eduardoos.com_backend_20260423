@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "65d921b4-b6ce-457c-a0ab-bd3a6bd9783f",
+  "id": "55f3f0bb-bedb-4b4e-9a52-948f9fee959c",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "lecciones": {
@@ -82,8 +82,8 @@
           "notNull": true,
           "autoincrement": false
         },
-        "username": {
-          "name": "username",
+        "email": {
+          "name": "email",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -106,10 +106,10 @@
         }
       },
       "indexes": {
-        "users_username_unique": {
-          "name": "users_username_unique",
+        "users_email_unique": {
+          "name": "users_email_unique",
           "columns": [
-            "username"
+            "email"
           ],
           "isUnique": true
         }

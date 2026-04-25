@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "cd8f594c-7eba-4f43-9e15-bce60c5ec438",
-  "prevId": "65d921b4-b6ce-457c-a0ab-bd3a6bd9783f",
+  "id": "eb3e86e2-e2f8-43f6-82ac-2452bef11f3c",
+  "prevId": "55f3f0bb-bedb-4b4e-9a52-948f9fee959c",
   "tables": {
     "lecciones": {
       "name": "lecciones",
@@ -139,7 +139,9 @@
   "_meta": {
     "schemas": {},
     "tables": {},
-    "columns": {}
+    "columns": {
+      "\"users\".\"email\"": "\"users\".\"username\""
+    }
   },
   "internal": {
     "indexes": {}
